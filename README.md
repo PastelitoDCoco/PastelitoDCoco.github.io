@@ -1,2 +1,277 @@
 # My web tocha
 by Quiquinyo
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quico Web - Acceso privado</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f6f7fb; color: #20232a; }
+    .container { max-width: 760px; margin: 40px auto; padding: 24px; background: white; border-radius: 12px; box-shadow: 0 16px 32px rgba(0,0,0,0.08); }
+    h1, h2 { margin-top: 0; }
+    label { display: block; margin: 16px 0 8px; font-weight: 600; }
+    input[type="text"], input[type="password"], input[type="file"] { width: 100%; padding: 10px 12px; border: 1px solid #ccd0d8; border-radius: 8px; box-sizing: border-box; }
+    button { margin-top: 16px; padding: 12px 18px; border: none; border-radius: 8px; background: #2f67f6; color: white; cursor: pointer; font-weight: 600; }
+    button:hover { background: #274dc6; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .row > * { flex: 1; }
+    .hidden { display: none; }
+    .message { margin-top: 16px; padding: 12px; border-radius: 8px; background: #fff4d9; color: #7a5800; }
+    .file-list { margin-top: 24px; }
+    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border: 1px solid #e3e7ee; border-radius: 10px; margin-top: 10px; background: #fafbff; }
+    .file-item span { max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-item button { background: #ff5252; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .info { font-size: 0.95rem; color: #4f5b71; }
+  </style>
+</head>
+<body>
+  <div class="container" id="loginScreen">
+    <h1>Acceso Quico Web</h1>
+    <p>Introduce tu usuario y contraseña para entrar.</p>
+    <form id="loginForm">
+      <label for="username">Usuario</label>
+      <input type="text" id="username" autocomplete="username" required>
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" autocomplete="current-password" required>
+      <button type="submit">Acceder</button>
+      <div class="message hidden" id="loginMessage"></div>
+    </form>
+  </div>
+
+  <div class="container hidden" id="appScreen">
+    <div class="top-bar">
+      <div>
+        <h1>Área privada</h1>
+        <p class="info">Solo tú puedes acceder con el usuario autorizado.</p>
+      </div>
+      <button id="logoutButton" type="button">Cerrar sesión</button>
+    </div>
+
+    <section>
+      <h2>Subir archivo</h2>
+      <form id="uploadForm">
+        <label for="fileInput">Elige un archivo (máx. 5 MB)</label>
+        <input type="file" id="fileInput" required>
+        <button type="submit">Guardar archivo</button>
+      </form>
+    </section>
+
+    <section style="margin-top: 24px;">
+      <h2>Cambiar contraseña</h2>
+      <form id="passwordForm">
+        <label for="currentPassword">Contraseña actual</label>
+        <input type="password" id="currentPassword" autocomplete="current-password" required>
+        <label for="newPassword">Nueva contraseña</label>
+        <input type="password" id="newPassword" autocomplete="new-password" required>
+        <label for="confirmPassword">Confirmar nueva contraseña</label>
+        <input type="password" id="confirmPassword" autocomplete="new-password" required>
+        <button type="submit">Cambiar contraseña</button>
+      </form>
+    </section>
+
+    <section class="file-list" id="fileListSection">
+      <h2>Archivos guardados</h2>
+      <div id="fileList">No hay archivos todavía.</div>
+    </section>
+
+    <div class="message hidden" id="appMessage"></div>
+  </div>
+
+  <div class="container">
+    <h2>Publicar gratis</h2>
+    <p>Para que esta página deje de ser solo un archivo local, publícala en GitHub Pages o Netlify. Sube este archivo a un repositorio público de GitHub y activa GitHub Pages, o súbelo usando Netlify Drop.</p>
+    <p class="info" style="margin-top: 0;">Ejemplo de enlace una vez publicado: <strong>https://TU-USUARIO.github.io/TU-REPO/</strong></p>
+    <p class="info" style="margin-top: 0;">GitHub Pages: <a href="https://pages.github.com/" target="_blank" rel="noopener">https://pages.github.com/</a></p>
+    <p class="info" style="margin-top: 0;">Netlify Drop: <a href="https://app.netlify.com/drop" target="_blank" rel="noopener">https://app.netlify.com/drop</a></p>
+  </div>
+
+  <script>
+    const EXPECTED_USER = 'QuicoForCR';
+    const PASSWORD_KEY = 'quicoWebPassword';
+    const DB_NAME = 'quicoWebFiles';
+    const STORE_NAME = 'files';
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+    const loginScreen = document.getElementById('loginScreen');
+    const appScreen = document.getElementById('appScreen');
+    const loginMessage = document.getElementById('loginMessage');
+    const appMessage = document.getElementById('appMessage');
+    const fileList = document.getElementById('fileList');
+
+    function init() {
+      if (!localStorage.getItem(PASSWORD_KEY)) {
+        localStorage.setItem(PASSWORD_KEY, 'trafalgarlawace10');
+      }
+      document.getElementById('loginForm').addEventListener('submit', handleLogin);
+      document.getElementById('logoutButton').addEventListener('click', logout);
+      document.getElementById('uploadForm').addEventListener('submit', handleUpload);
+      document.getElementById('passwordForm').addEventListener('submit', handleChangePassword);
+    }
+
+    function showMessage(element, text) {
+      element.textContent = text;
+      element.classList.remove('hidden');
+      setTimeout(() => element.classList.add('hidden'), 4000);
+    }
+
+    function handleLogin(event) {
+      event.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const storedPassword = localStorage.getItem(PASSWORD_KEY);
+      if (username === EXPECTED_USER && password === storedPassword) {
+        loginScreen.classList.add('hidden');
+        appScreen.classList.remove('hidden');
+        loadFiles();
+      } else {
+        showMessage(loginMessage, 'Usuario o contraseña incorrectos.');
+      }
+    }
+
+    function logout() {
+      appScreen.classList.add('hidden');
+      loginScreen.classList.remove('hidden');
+      document.getElementById('loginForm').reset();
+    }
+
+    function openDatabase() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = function(event) {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = function(event) {
+          resolve(event.target.result);
+        };
+        request.onerror = function(event) {
+          reject(event.target.error);
+        };
+      });
+    }
+
+    async function handleUpload(event) {
+      event.preventDefault();
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!file) {
+        showMessage(appMessage, 'Selecciona un archivo antes de subir.');
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        showMessage(appMessage, 'El archivo supera el límite de 5 MB.');
+        return;
+      }
+      try {
+        const db = await openDatabase();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const record = {
+          id: Date.now() + '-' + file.name,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          blob: file,
+          created: new Date().toISOString()
+        };
+        store.add(record);
+        transaction.oncomplete = () => {
+          showMessage(appMessage, 'Archivo guardado correctamente.');
+          fileInput.value = '';
+          loadFiles();
+        };
+        transaction.onerror = () => {
+          showMessage(appMessage, 'Error guardando el archivo.');
+        };
+      } catch (error) {
+        showMessage(appMessage, 'Error al acceder a la base de datos.');
+      }
+    }
+
+    async function loadFiles() {
+      try {
+        const db = await openDatabase();
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const files = request.result;
+          if (!files || files.length === 0) {
+            fileList.innerHTML = '<p>No hay archivos todavía.</p>';
+            return;
+          }
+          fileList.innerHTML = '';
+          files.sort((a,b) => b.created.localeCompare(a.created));
+          files.forEach(file => {
+            const item = document.createElement('div');
+            item.className = 'file-item';
+            const fileName = document.createElement('span');
+            fileName.textContent = file.name + ' (' + Math.round(file.size / 1024) + ' KB)';
+            const actions = document.createElement('div');
+            const download = document.createElement('a');
+            download.textContent = 'Descargar';
+            download.href = URL.createObjectURL(file.blob);
+            download.download = file.name;
+            download.style.marginRight = '12px';
+            const remove = document.createElement('button');
+            remove.textContent = 'Eliminar';
+            remove.type = 'button';
+            remove.addEventListener('click', () => deleteFile(file.id));
+            actions.appendChild(download);
+            actions.appendChild(remove);
+            item.appendChild(fileName);
+            item.appendChild(actions);
+            fileList.appendChild(item);
+          });
+        };
+        request.onerror = () => {
+          fileList.innerHTML = '<p>Error cargando archivos.</p>';
+        };
+      } catch (error) {
+        fileList.innerHTML = '<p>Error al abrir la base de datos.</p>';
+      }
+    }
+
+    async function deleteFile(id) {
+      try {
+        const db = await openDatabase();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        store.delete(id);
+        transaction.oncomplete = () => {
+          showMessage(appMessage, 'Archivo eliminado.');
+          loadFiles();
+        };
+      } catch (error) {
+        showMessage(appMessage, 'Error eliminando el archivo.');
+      }
+    }
+
+    function handleChangePassword(event) {
+      event.preventDefault();
+      const currentPassword = document.getElementById('currentPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const storedPassword = localStorage.getItem(PASSWORD_KEY);
+      if (currentPassword !== storedPassword) {
+        showMessage(appMessage, 'La contraseña actual no es correcta.');
+        return;
+      }
+      if (!newPassword || newPassword !== confirmPassword) {
+        showMessage(appMessage, 'Las nuevas contraseñas no coinciden.');
+        return;
+      }
+      localStorage.setItem(PASSWORD_KEY, newPassword);
+      document.getElementById('passwordForm').reset();
+      showMessage(appMessage, 'Contraseña cambiada con éxito.');
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
